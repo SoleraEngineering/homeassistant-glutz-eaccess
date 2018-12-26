@@ -12,8 +12,11 @@ import traceback
 
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.discovery import async_load_platform
 
-from .const import DOMAIN, CONF_URL, CONF_PROXY, DATA_GLUTZ_CONFIG, DATA_GLUTZ
+# from homeassistant import config_entries
+
+from .const import DOMAIN, CONF_URL, CONF_PROXY, DATA_GLUTZ_CONFIG, DATA_GLUTZ, CONF_USERNAME, CONF_PASSWORD
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -21,7 +24,9 @@ _LOGGER = logging.getLogger(__name__)
 CONFIG_SCHEMA = vol.Schema({
     DOMAIN: vol.Schema({
         vol.Required(CONF_URL): cv.url,
-        vol.Optional(CONF_PROXY, default=None): cv.url
+        vol.Optional(CONF_PROXY, default=None): cv.url,
+        vol.Optional(CONF_USERNAME, default=None): cv.string,
+        vol.Optional(CONF_PASSWORD, default=None): cv.string
     })
 }, extra=vol.ALLOW_EXTRA)
 
@@ -30,7 +35,7 @@ CONFIG_SCHEMA = vol.Schema({
 async def async_setup(hass, config):
     """Setup Glutz eAccess Controller"""
 
-    _LOGGER.debug('async_setup: %s', str(config))
+    _LOGGER.debug('async_setup')
 
     if DOMAIN not in config:
         return
@@ -38,12 +43,31 @@ async def async_setup(hass, config):
     _LOGGER.debug('async_setup has config')
 
     conf = config[DOMAIN]
-    glutz = GlutzController(hass, conf)
-
     hass.data[DATA_GLUTZ_CONFIG] = conf
+
+    glutz = GlutzController(hass, conf)
     hass.data[DATA_GLUTZ] = glutz
 
+    for component in ['lock']:
+        _LOGGER.debug('load_platform: %s', component)
+        await async_load_platform(hass, component, DOMAIN, None, config)
+
     return True
+
+
+# async def async_setup_entry(hass, entry):
+#    _LOGGER.debug('async_setup_entry');
+#
+#    conf = hass.data[DATA_GLUTZ_CONFIG];
+#
+#    for component in 'lock':
+#        _LOGGER.debug('forward_entry_setup: %s', component)
+#        hass.async_create_task(hass.config_entries.async_forward_entry_setup(entry, component))
+#
+#
+# config_entry_flow.register_discovery_flow(
+#    DOMAIN, 'Glutz', _async_has_devices, config_entries.CONN_CLASS_LOCAL_PUSH)
+
 
 
 class GlutzRetryError(TimeoutError):
@@ -93,6 +117,8 @@ class GlutzController:
         self._url = conf[CONF_URL]
         self._session = async_get_clientsession(hass)
         self._proxy = conf[CONF_PROXY]
+        self._username = conf[CONF_USERNAME]
+        self._password = conf[CONF_PASSWORD]
         self._stats = {'errors': 0, 'requests': 0}
 
     async def discover_access_points(self):
@@ -122,14 +148,19 @@ class GlutzController:
             'jsonrpc': '2.0'
         }
 
-        async with self._get_session().post(self._url, json=json, proxy=self._proxy) as r:
+        auth = None
+
+        if self._username is not None:
+            auth = aiohttp.helpers.BasicAuth(self._username, self._password)
+
+        async with self._get_session().post(self._url, json=json, proxy=self._proxy,auth=auth) as r:
             result = await r.json()
 
-            _LOGGER.debug('glutz_request: (%d) %s -- %s', r.status, str(result), str(r.request_info))
-            print("Result", r.status, str(result), str(r.request_info))
+            _LOGGER.debug('glutz_request: (%d) %s -- %s -- %s', r.status, str(json), str(result), str(r.request_info))
+            # print("Result", r.status, str(result), str(r.request_info))
             r.raise_for_status()
 
-            return result
+            return result.get('result')
 
     # @property
     # def control4(self):
