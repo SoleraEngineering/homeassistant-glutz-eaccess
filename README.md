@@ -1,6 +1,17 @@
 # Glutz eAccess Integration for Home Assistant
 
 
+## Home Asssistant Configuration
+
+In `configuration.yml`:
+```yaml
+glutz:
+  url: http://192.1.2.3:8080/rpc/
+  proxy: http://http-proxy:9090
+  username: glutz-api-username
+  password: glutz-api-password
+```
+
 
 
 ## Developer Setup
