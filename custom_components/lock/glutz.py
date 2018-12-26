@@ -3,6 +3,7 @@ Glutz eAccess lock platform
 """
 from homeassistant.components.lock import LockDevice, SUPPORT_OPEN
 from homeassistant.const import (STATE_LOCKED, STATE_UNLOCKED)
+from ..glutz.const import DATA_GLUTZ
 
 
 async def async_setup_platform(hass, config, add_entities, discovery_info=None):
@@ -20,10 +21,10 @@ class GlutzLock(LockDevice):
 
     def __init__(self, device, glutz):
         """Initialize the lock."""
-        self._name = device.label
-        self._state = self.resolve_state(device.get('state', 'locked'))
+        self._name = device['label']
+        self._state = self.resolve_state(device.get('state'))
         self._glutz = glutz
-        self._id = device.id
+        self._id = device['id']
 
 
     @property
